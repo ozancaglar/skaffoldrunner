@@ -2,9 +2,8 @@ package prompts
 
 import (
 	"fmt"
-	"slices"
-
 	"github.com/manifoldco/promptui"
+	"slices"
 )
 
 type SelectPromptParams struct {
@@ -13,7 +12,7 @@ type SelectPromptParams struct {
 }
 
 const (
-	SELECTED_ALL_ITEMS = "I'm done selecting items ✅"
+	SELECTED_ALL_ITEMS = "I'm done selecting items"
 )
 
 // SelectPrompt prompts the user with a selection of items and returns the string representing the item they selected
@@ -37,7 +36,10 @@ func MultiSelectPrompt(params SelectPromptParams) ([]string, error) {
 	params.Items = append(params.Items, SELECTED_ALL_ITEMS)
 	var selectedItems []string
 
-	for !slices.Contains(selectedItems, SELECTED_ALL_ITEMS) {
+	for {
+		if len(params.Items) == 1 || slices.Contains(selectedItems, SELECTED_ALL_ITEMS) {
+			break
+		}
 		result, err := SelectPrompt(params)
 		if err != nil {
 			return nil, fmt.Errorf("error running SelectPrompt: %w", err)
@@ -46,7 +48,7 @@ func MultiSelectPrompt(params SelectPromptParams) ([]string, error) {
 		params.Items = slices.DeleteFunc(params.Items, func(item string) bool { return item == result })
 	}
 
-	selectedItems = selectedItems[0 : len(selectedItems)-1]
+	selectedItems = slices.DeleteFunc(selectedItems, func(item string) bool { return item == SELECTED_ALL_ITEMS })
 
 	if len(selectedItems) == 0 {
 		return nil, fmt.Errorf("no items selected in prompt")
