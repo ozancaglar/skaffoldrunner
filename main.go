@@ -21,7 +21,6 @@ const (
 	MODULE_FLAG  = "-m"
 )
 
-// App represents your application and holds data needed across commands
 type App struct {
 	FilePath         string
 	Modules          []string
@@ -29,8 +28,52 @@ type App struct {
 }
 
 func main() {
-	app := App{}
-	app.initialise()
+	var app App
+
+	var rootCmd = &cobra.Command{
+		Use:   "skaffoldrunner",
+		Short: "Skaffoldrunner reads the skaffold.yaml file and launches the selected modules",
+		Long: `Skaffoldrunner is a CLI tool that helps you run Skaffold more efficiently
+by allowing you to select modes, profiles, and modules interactively.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			app.runSkaffold()
+		},
+	}
+
+	rootCmd.PersistentFlags().StringVarP(&app.WorkingDirectory, "workdir", "w", "", "Working directory (default is current directory)")
+
+	if err := rootCmd.Execute(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func (a *App) initialise() error {
+	if a.WorkingDirectory == "" {
+		fmt.Println("Running skaffold from current location as no --workdir specified")
+	}
+
+	skaffoldPath := "skaffold.yaml"
+	if a.WorkingDirectory != "" {
+		skaffoldPath = a.WorkingDirectory + skaffoldPath
+	}
+
+	modules, err := parser.ParseYamlForModules(skaffoldPath)
+	if err != nil {
+		return err
+	}
+
+	if len(modules) == 0 {
+		return fmt.Errorf("no modules found for file at %s", a.FilePath)
+	}
+
+	a.Modules = modules
+	return nil
+}
+
+func (a *App) runSkaffold() {
+	if err := a.initialise(); err != nil {
+		log.Fatal(err)
+	}
 
 	modeResult, err := prompts.SelectPrompt(prompts.SelectPromptParams{
 		Label: "Which mode would you like to run in?",
@@ -57,14 +100,13 @@ func main() {
 	}
 
 	var selectedModules []string
-	if len(app.Modules) > 0 {
-		selectedModules, err = prompts.MultiSelectPrompt(prompts.SelectPromptParams{Label: "Select the modules you'd like to run", Items: app.Modules}, true)
+	if len(a.Modules) > 0 {
+		selectedModules, err = prompts.MultiSelectPrompt(prompts.SelectPromptParams{Label: "Select the modules you'd like to run", Items: a.Modules}, true)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
-	// Prepare arguments slice
 	var args []string
 	args = append(args, modeResult)
 
@@ -78,8 +120,8 @@ func main() {
 	cmd := exec.CommandContext(ctx, SKAFFOLD, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	if app.WorkingDirectory != "" {
-		cmd.Dir = app.WorkingDirectory
+	if a.WorkingDirectory != "" {
+		cmd.Dir = a.WorkingDirectory
 	}
 
 	// Listen for interrupt signals
@@ -94,37 +136,6 @@ func main() {
 		}
 	}()
 
-	// Wait for an interrupt signal
 	<-sigChan
 	fmt.Println("Interrupt signal received, terminating the process...")
-}
-
-func (a *App) initialise() {
-	var rootCmd = &cobra.Command{
-		Use:   "skaffoldrunner",
-		Short: "Skaffoldrunner reads the skaffold.yaml file in the specified wd and launches the selected modules for you",
-		Run: func(cmd *cobra.Command, args []string) {
-			a.WorkingDirectory, _ = cmd.Flags().GetString("workdir")
-			if a.WorkingDirectory == "" {
-				fmt.Println("running skaffold from current location as no --workdir specified")
-			}
-
-			modules, err := parser.ParseYamlForModules(a.WorkingDirectory + "/skaffold.yaml")
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			if len(modules) == 0 {
-				log.Fatalf("no modules found for file at %s", a.FilePath)
-			}
-
-			a.Modules = modules
-		},
-	}
-
-	rootCmd.PersistentFlags().StringVarP(&a.WorkingDirectory, "workdir", "w", "", "Working directory")
-
-	if err := rootCmd.Execute(); err != nil {
-		log.Fatal(err)
-	}
 }
