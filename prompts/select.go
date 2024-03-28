@@ -32,7 +32,7 @@ func SelectPrompt(params SelectPromptParams) (string, error) {
 }
 
 // MultiSelectPrompt prompts the user with a selection of items and returns the strings representing the item they selected
-func MultiSelectPrompt(params SelectPromptParams) ([]string, error) {
+func MultiSelectPrompt(params SelectPromptParams, mustSelectItems bool) ([]string, error) {
 	params.Items = append(params.Items, SELECTED_ALL_ITEMS)
 	var selectedItems []string
 
@@ -50,7 +50,7 @@ func MultiSelectPrompt(params SelectPromptParams) ([]string, error) {
 
 	selectedItems = slices.DeleteFunc(selectedItems, func(item string) bool { return item == SELECTED_ALL_ITEMS })
 
-	if len(selectedItems) == 0 {
+	if len(selectedItems) == 0 && mustSelectItems {
 		return nil, fmt.Errorf("no items selected in prompt")
 	}
 
