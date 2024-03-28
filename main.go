@@ -109,7 +109,7 @@ func (a *App) initialise() {
 				fmt.Println("running skaffold from current location as no --workdir specified")
 			}
 
-			modules, err := parser.ParseYamlForModules("skaffold.yaml")
+			modules, err := parser.ParseYamlForModules(a.WorkingDirectory + "/skaffold.yaml")
 			if err != nil {
 				log.Fatal(err)
 			}
